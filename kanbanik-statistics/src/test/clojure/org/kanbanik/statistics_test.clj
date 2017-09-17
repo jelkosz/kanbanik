@@ -13,6 +13,32 @@
     (is (= 9 (first-timestamp [{:timestamp 10} {:timestamp 12}])))
     )
 
+  (testing "reducer-progressive-count"
+    (let [
+          i1p1b1w1C {:eventType "TaskCreated" :projectId 1 :boardId 1 :workflowitem 1 :entityId 1}
+          i2p1b1w1C {:eventType "TaskCreated" :projectId 1 :boardId 1 :workflowitem 1 :entityId 2}
+          i2p1b1w2M {:eventType "TaskMoved" :projectId 1 :boardId 1 :workflowitem 2 :entityId 2}
+          i1p1b1w1D {:eventType "TaskDeleted" :projectId 1 :boardId 1 :workflowitem 1 :entityId 1}
+          ]
+      
+      (let [first-call (progressive-count {:function nil :chunk i1p1b1w1C :prev {}})]
+        (is (= {1 i1p1b1w1C} (:meta first-call)))
+        (is (= [1] (get (:data first-call) {:projectId 1 :boardId 1 :workflowitem 1})))
+        (let [second-call (progressive-count {:function nil :chunk i2p1b1w1C :prev first-call})]
+          (is (= {1 i1p1b1w1C 2 i2p1b1w1C} (:meta second-call)))
+          (is (= [1 2] (get (:data second-call) {:projectId 1 :boardId 1 :workflowitem 1})))
+          
+          (let [third-call (progressive-count {:function nil :chunk i1p1b1w1D :prev second-call})]
+            (is (= {1 i1p1b1w1D 2 i2p1b1w1C} (:meta third-call)))
+            (is (= [1 2 1] (get (:data third-call) {:projectId 1 :boardId 1 :workflowitem 1})))
+
+            (let [fourth-call (progressive-count {:function nil :chunk i2p1b1w2M :prev third-call})]
+              (print (apply str fourth-call))
+              (is (= {1 i1p1b1w1D 2 i2p1b1w2M} (:meta fourth-call)))
+              (is (= [1 2 1 0] (get (:data fourth-call) {:projectId 1 :boardId 1 :workflowitem 1})))
+              (is (= [1] (get (:data fourth-call) {:projectId 1 :boardId 1 :workflowitem 2})))
+              ))))))
+
   (testing "reduce-tasks"
      (let [
           id1t10 {:timestamp 10 :entityId 1}
@@ -72,7 +98,6 @@
           id4tl4 {:timestamp 1501918229303 :entityId 4}
          ]
       (is (= 0 (count (group-by-timeframe [] 1))))
-
       (is (= 3 (count (group-by-timeframe [id1t10 id1t20 id2t30] 10))))
       (is (= 21 (count (group-by-timeframe [id1t10 id1t20 id2t30] 1))))
       (is (= 21 (count (group-by-timeframe [id1t10 id1t20 id2t30] 0))))
@@ -128,4 +153,5 @@
         (is (= [[1] [1] [2]] (run-analisis full-descriptor 10 full-stream)))
         (is (= [[2]] (run-analisis full-descriptor 100 full-stream)))
     )))
+
 )
