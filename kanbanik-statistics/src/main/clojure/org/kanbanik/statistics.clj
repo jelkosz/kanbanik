@@ -78,20 +78,23 @@ Example data
       (assoc-in
        (assoc-in prev [:meta (:entityId chunk)] chunk)
        [:data place-id] (conj-to-data (get (:data prev) place-id) 1))
-      (if (= "TaskDeleted" (:eventType chunk))
+      (if (and (= "TaskDeleted" (:eventType chunk)) (get-in prev [:meta (:entityId chunk)]))
         (assoc-in
          (assoc-in prev [:meta (:entityId chunk)] chunk)
          [:data place-id] (conj-to-data (get (:data prev) place-id) -1))
         (if (= "TaskMoved" (:eventType chunk))
-          (let [prev-place-id (assoc-in place-id [:workflowitem] (get-in prev [:meta (:entityId chunk) :workflowitem]))]
-            (assoc-in
-              (assoc-in
-                (assoc-in 
-                  prev [:meta (:entityId chunk)] chunk)
-                  [:data place-id] (conj-to-data (get (:data prev) place-id) 1))
-                  [:data prev-place-id] (conj-to-data (get (:data prev) prev-place-id) -1))
-
-))))))
+          (let [
+                prev-place-id (assoc-in place-id [:workflowitem] (get-in prev [:meta (:entityId chunk) :workflowitem]))
+                common-assoc (assoc-in
+                  (assoc-in
+                    prev [:meta (:entityId chunk)] chunk)
+                    [:data place-id] (conj-to-data (get (:data prev) place-id) 1))
+                prev-data (get (:data prev) prev-place-id)]
+            (if prev-data
+              (assoc-in common-assoc [:data prev-place-id] (conj-to-data prev-data -1))
+              common-assoc))
+          ; if none of the processed events, ignore and return the previous state
+          prev)))))
 
 (defn reduce-chunk [specific-function grouped-chunks]
     ; {1 [{:timestamp 10, :entityId 1} {:timestamp 20, :entityId 1}], 2 [{:timestamp 30, :entityId 2}]}
